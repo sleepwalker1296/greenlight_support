@@ -82,8 +82,11 @@ async def add_user(user_id: int, username: str, full_name: str):
     """Добавить или обновить пользователя"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute('''
-            INSERT OR REPLACE INTO users (user_id, username, full_name, created_at)
+            INSERT INTO users (user_id, username, full_name, created_at)
             VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                username = excluded.username,
+                full_name = excluded.full_name
         ''', (user_id, username, full_name, datetime.now().isoformat()))
         await db.commit()
 

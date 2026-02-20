@@ -5,7 +5,11 @@ from aiogram import Router, F
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
 
-from app.db import add_user, set_user_active, get_user, get_all_messages_from_db
+from datetime import datetime
+from app.db import (
+    add_user, set_user_active, get_user, get_all_messages_from_db,
+    get_current_message_index, get_message_by_index, log_sent_message, get_total_messages
+)
 
 router = Router()
 
@@ -71,7 +75,7 @@ async def start_training(message: Message):
     
     # Активируем пользователя
     await set_user_active(user_id, True)
-    
+
     await message.answer(
         "✅ *Тренировка началась!*\n\n"
         "📨 Сообщения от «клиентов» будут приходить автоматически.\n"
@@ -82,6 +86,26 @@ async def start_training(message: Message):
         "Удачи! 💪",
         parse_mode="Markdown"
     )
+
+    # Сразу отправляем первое (текущее) сообщение, не дожидаясь планировщика
+    current_index = await get_current_message_index()
+    total = await get_total_messages()
+    if current_index <= total:
+        msg_data = await get_message_by_index(current_index)
+        if msg_data:
+            message_text = (
+                f"📨 *Сообщение #{current_index}*\n\n"
+                f"_{msg_data.get('category', 'Общее')}_\n\n"
+                f"{msg_data['text']}"
+            )
+            sent_at = datetime.now().isoformat()
+            await message.answer(message_text, parse_mode="Markdown")
+            await log_sent_message(
+                user_id=user_id,
+                message_index=current_index,
+                message_text=msg_data['text'],
+                sent_at=sent_at
+            )
 
 
 @router.message(F.text == "📄 Скрипты")
