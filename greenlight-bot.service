@@ -1,0 +1,15 @@
+[Unit]
+Description=GreenLight Support Training Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/user/greenlight_support
+ExecStart=/usr/bin/python3 /home/user/greenlight_support/run.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
