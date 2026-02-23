@@ -1,10 +1,13 @@
 """
 Планировщик для автоматической рассылки сообщений
 """
+import logging
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import pytz
+
+logger = logging.getLogger(__name__)
 
 from app.config import (
     MESSAGE_INTERVAL_MINUTES, 
@@ -55,33 +58,35 @@ async def send_training_messages():
     global bot
     
     if bot is None:
-        print("⚠️ Бот не инициализирован")
+        logger.warning("Бот не инициализирован")
         return
-    
+
     # Проверка рабочего времени
     if not is_work_time():
-        print(f"⏰ Вне рабочего времени ({WORK_HOURS_START}:00 - {WORK_HOURS_END}:00)")
+        logger.info(f"Вне рабочего времени ({WORK_HOURS_START}:00 - {WORK_HOURS_END}:00)")
         return
-    
+
     # Получаем текущий индекс сообщения
     current_index = await get_current_message_index()
     total_messages = await get_total_messages()
-    
+
+    logger.info(f"Текущий индекс: {current_index}, всего сообщений: {total_messages}")
+
     # Проверяем, есть ли ещё сообщения
     if current_index > total_messages:
-        print("📝 Все сообщения сценария уже отправлены")
+        logger.info("Все сообщения сценария уже отправлены")
         return
-    
+
     # Получаем сообщение
     message_data = await get_message_by_index(current_index)
     if not message_data:
-        print(f"⚠️ Сообщение с индексом {current_index} не найдено")
+        logger.warning(f"Сообщение с индексом {current_index} не найдено")
         return
-    
+
     # Получаем активных пользователей
     active_users = await get_active_users()
     if not active_users:
-        print("👤 Нет активных пользователей")
+        logger.warning("Нет активных пользователей")
         return
     
     # Время отправки (одинаковое для всех)
@@ -112,9 +117,9 @@ async def send_training_messages():
             sent_count += 1
             
         except Exception as e:
-            print(f"❌ Ошибка отправки пользователю {user['user_id']}: {e}")
-    
-    print(f"✅ Сообщение #{current_index} отправлено {sent_count} пользователям")
+            logger.error(f"Ошибка отправки пользователю {user['user_id']}: {e}")
+
+    logger.info(f"Сообщение #{current_index} отправлено {sent_count} пользователям")
 
 
 def start_scheduler():
@@ -132,7 +137,7 @@ def start_scheduler():
     )
     
     scheduler.start()
-    print(f"🚀 Планировщик запущен (интервал: {MESSAGE_INTERVAL_MINUTES} мин)")
+    logger.info(f"Планировщик запущен (интервал: {MESSAGE_INTERVAL_MINUTES} мин)")
 
 
 def stop_scheduler():

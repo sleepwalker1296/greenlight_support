@@ -17,12 +17,13 @@ from app.scheduler import set_bot, start_scheduler, stop_scheduler
 # Импорт роутеров
 from app.handlers import start, answers, admin
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout
-)
+# Настройка логирования — в файл и в консоль
+_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+_file_handler = logging.FileHandler('bot.log', encoding='utf-8')
+_file_handler.setFormatter(_log_formatter)
+_console_handler = logging.StreamHandler(sys.stdout)
+_console_handler.setFormatter(_log_formatter)
+logging.basicConfig(level=logging.INFO, handlers=[_file_handler, _console_handler])
 logger = logging.getLogger(__name__)
 
 

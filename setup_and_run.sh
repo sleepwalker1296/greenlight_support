@@ -21,5 +21,12 @@ screen -dmS greenlight_bot bash -c '
 '
 
 echo "=== Бот запущен ==="
-echo "Логи: screen -r greenlight_bot"
-echo "Остановить: screen -S greenlight_bot -X quit"
+echo ""
+echo "Смотреть логи в реальном времени:"
+echo "  tail -f $(pwd)/bot.log"
+echo ""
+echo "Зайти в screen сессию:"
+echo "  screen -r greenlight_bot"
+echo ""
+echo "Остановить бота:"
+echo "  screen -S greenlight_bot -X quit"
