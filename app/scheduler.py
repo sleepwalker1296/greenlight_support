@@ -80,12 +80,10 @@ async def send_training_messages():
 
         # Проверяем, прошло ли достаточно времени с последнего сообщения
         last_time = await get_user_last_message_time(user_id)
-        if last_time is None:
-            # Первое сообщение отправляет обработчик кнопки — пропускаем
-            continue
-        elapsed_minutes = (now - last_time).total_seconds() / 60
-        if elapsed_minutes < MESSAGE_INTERVAL_MINUTES:
-            continue
+        if last_time is not None:
+            elapsed_minutes = (now - last_time).total_seconds() / 60
+            if elapsed_minutes < MESSAGE_INTERVAL_MINUTES:
+                continue
 
         # Определяем следующий индекс для этого пользователя
         next_index = await get_user_next_message_index(user_id)
