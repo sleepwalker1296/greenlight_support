@@ -256,6 +256,13 @@ async def get_user_next_message_index(user_id: int) -> int:
         return (row[0] + 1) if row and row[0] else 1
 
 
+async def clear_user_logs(user_id: int):
+    """Очистить логи конкретного пользователя (при перезапуске тренировки)"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute('DELETE FROM logs WHERE user_id = ?', (user_id,))
+        await db.commit()
+
+
 async def reset_training():
     """Сбросить всю тренировку"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
