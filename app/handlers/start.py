@@ -8,7 +8,7 @@ from aiogram.filters import Command
 from datetime import datetime
 from app.db import (
     add_user, set_user_active, get_user, get_all_messages_from_db,
-    get_current_message_index, get_message_by_index, log_sent_message, get_total_messages
+    get_message_by_index, log_sent_message, get_total_messages, clear_user_logs
 )
 
 router = Router()
@@ -73,7 +73,8 @@ async def start_training(message: Message):
         )
         return
     
-    # Активируем пользователя
+    # Сбрасываем личные логи пользователя — тренировка начинается с #1
+    await clear_user_logs(user_id)
     await set_user_active(user_id, True)
 
     await message.answer(
@@ -87,14 +88,13 @@ async def start_training(message: Message):
         parse_mode="Markdown"
     )
 
-    # Сразу отправляем первое (текущее) сообщение, не дожидаясь планировщика
-    current_index = await get_current_message_index()
+    # Сразу отправляем сообщение #1
     total = await get_total_messages()
-    if current_index <= total:
-        msg_data = await get_message_by_index(current_index)
+    if total > 0:
+        msg_data = await get_message_by_index(1)
         if msg_data:
             message_text = (
-                f"📨 *Сообщение #{current_index}*\n\n"
+                f"📨 *Сообщение #1*\n\n"
                 f"_{msg_data.get('category', 'Общее')}_\n\n"
                 f"{msg_data['text']}"
             )
@@ -102,7 +102,7 @@ async def start_training(message: Message):
             await message.answer(message_text, parse_mode="Markdown")
             await log_sent_message(
                 user_id=user_id,
-                message_index=current_index,
+                message_index=1,
                 message_text=msg_data['text'],
                 sent_at=sent_at
             )

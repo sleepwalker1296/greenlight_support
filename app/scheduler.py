@@ -16,11 +16,12 @@ from app.config import (
     TIMEZONE
 )
 from app.db import (
-    get_active_users, 
-    get_message_by_index, 
+    get_active_users,
+    get_message_by_index,
     log_sent_message,
-    get_current_message_index,
-    get_total_messages
+    get_total_messages,
+    get_user_last_message_time,
+    get_user_next_message_index,
 )
 
 # Глобальная переменная для бота (будет установлена из main.py)
@@ -53,10 +54,11 @@ def is_work_time() -> bool:
 async def send_training_messages():
     """
     Основная функция рассылки сообщений.
-    Вызывается планировщиком каждые N минут.
+    Вызывается каждую минуту, отправляет каждому пользователю
+    следующее сообщение если прошло >= MESSAGE_INTERVAL_MINUTES с последнего.
     """
     global bot
-    
+
     if bot is None:
         logger.warning("Бот не инициализирован")
         return
@@ -66,60 +68,56 @@ async def send_training_messages():
         logger.info(f"Вне рабочего времени ({WORK_HOURS_START}:00 - {WORK_HOURS_END}:00)")
         return
 
-    # Получаем текущий индекс сообщения
-    current_index = await get_current_message_index()
-    total_messages = await get_total_messages()
-
-    logger.info(f"Текущий индекс: {current_index}, всего сообщений: {total_messages}")
-
-    # Проверяем, есть ли ещё сообщения
-    if current_index > total_messages:
-        logger.info("Все сообщения сценария уже отправлены")
-        return
-
-    # Получаем сообщение
-    message_data = await get_message_by_index(current_index)
-    if not message_data:
-        logger.warning(f"Сообщение с индексом {current_index} не найдено")
-        return
-
-    # Получаем активных пользователей
     active_users = await get_active_users()
     if not active_users:
-        logger.warning("Нет активных пользователей")
         return
-    
-    # Время отправки (одинаковое для всех)
-    sent_at = datetime.now().isoformat()
-    
-    # Формируем текст сообщения
-    message_text = f"📨 *Сообщение #{current_index}*\n\n"
-    message_text += f"_{message_data.get('category', 'Общее')}_\n\n"
-    message_text += message_data['text']
-    
-    # Отправляем всем активным пользователям
-    sent_count = 0
+
+    total_messages = await get_total_messages()
+    now = datetime.now()
+
     for user in active_users:
+        user_id = user['user_id']
+
+        # Проверяем, прошло ли достаточно времени с последнего сообщения
+        last_time = await get_user_last_message_time(user_id)
+        if last_time is None:
+            # Первое сообщение отправляет обработчик кнопки — пропускаем
+            continue
+        elapsed_minutes = (now - last_time).total_seconds() / 60
+        if elapsed_minutes < MESSAGE_INTERVAL_MINUTES:
+            continue
+
+        # Определяем следующий индекс для этого пользователя
+        next_index = await get_user_next_message_index(user_id)
+        if next_index > total_messages:
+            logger.info(f"Все сообщения отправлены пользователю {user_id}")
+            continue
+
+        message_data = await get_message_by_index(next_index)
+        if not message_data:
+            logger.warning(f"Сообщение {next_index} не найдено")
+            continue
+
+        message_text = f"📨 *Сообщение #{next_index}*\n\n"
+        message_text += f"_{message_data.get('category', 'Общее')}_\n\n"
+        message_text += message_data['text']
+
+        sent_at = now.isoformat()
         try:
             await bot.send_message(
-                chat_id=user['user_id'],
+                chat_id=user_id,
                 text=message_text,
                 parse_mode="Markdown"
             )
-            
-            # Логируем отправку
             await log_sent_message(
-                user_id=user['user_id'],
-                message_index=current_index,
+                user_id=user_id,
+                message_index=next_index,
                 message_text=message_data['text'],
                 sent_at=sent_at
             )
-            sent_count += 1
-            
+            logger.info(f"Сообщение #{next_index} отправлено пользователю {user_id}")
         except Exception as e:
-            logger.error(f"Ошибка отправки пользователю {user['user_id']}: {e}")
-
-    logger.info(f"Сообщение #{current_index} отправлено {sent_count} пользователям")
+            logger.error(f"Ошибка отправки пользователю {user_id}: {e}")
 
 
 def start_scheduler():
@@ -130,14 +128,14 @@ def start_scheduler():
     # Добавляем задачу рассылки
     scheduler.add_job(
         send_training_messages,
-        trigger=IntervalTrigger(minutes=MESSAGE_INTERVAL_MINUTES),
+        trigger=IntervalTrigger(minutes=1),
         id='training_messages',
         name='Рассылка тренировочных сообщений',
         replace_existing=True
     )
-    
+
     scheduler.start()
-    logger.info(f"Планировщик запущен (интервал: {MESSAGE_INTERVAL_MINUTES} мин)")
+    logger.info(f"Планировщик запущен (проверка каждую минуту, интервал между сообщениями: {MESSAGE_INTERVAL_MINUTES} мин)")
 
 
 def stop_scheduler():

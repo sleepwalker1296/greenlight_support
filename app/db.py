@@ -233,6 +233,36 @@ async def get_current_message_index() -> int:
         return 1  # Начинаем с первого сообщения
 
 
+async def get_user_last_message_time(user_id: int) -> Optional[datetime]:
+    """Получить время последнего отправленного сообщения для пользователя"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cursor = await db.execute(
+            'SELECT sent_at FROM logs WHERE user_id = ? ORDER BY message_index DESC LIMIT 1',
+            (user_id,)
+        )
+        row = await cursor.fetchone()
+        if row and row[0]:
+            return datetime.fromisoformat(row[0])
+        return None
+
+
+async def get_user_next_message_index(user_id: int) -> int:
+    """Получить следующий индекс сообщения для конкретного пользователя"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cursor = await db.execute(
+            'SELECT MAX(message_index) FROM logs WHERE user_id = ?', (user_id,)
+        )
+        row = await cursor.fetchone()
+        return (row[0] + 1) if row and row[0] else 1
+
+
+async def clear_user_logs(user_id: int):
+    """Очистить логи конкретного пользователя (при перезапуске тренировки)"""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute('DELETE FROM logs WHERE user_id = ?', (user_id,))
+        await db.commit()
+
+
 async def reset_training():
     """Сбросить всю тренировку"""
     async with aiosqlite.connect(DATABASE_PATH) as db:
